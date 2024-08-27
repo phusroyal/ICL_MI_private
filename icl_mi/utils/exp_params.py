@@ -15,6 +15,10 @@ def get_default_parser():
                         type= str,
                         help="Model's name")
 
+    parser.add_argument('-num_of_bins',
+                        '-nbins', dest="num_of_bins", default=30, type=int,
+                        help='The number of bins that we divide the output of the neurons')
+
     # parser.add_argument('-start_samples',
     #                     '-ss', dest="start_samples", default=1,
     #                     type=int, help='The number of the first sample that we calculate the information')
@@ -80,10 +84,6 @@ def get_default_parser():
     # parser.add_argument('-run_in_parallel',
     #                     '-par', dest="run_in_parallel", type=str2bool, nargs='?', const=False, default=False,
     #                     help='If we want to run all the networks in parallel mode')
-
-    # parser.add_argument('-num_of_bins',
-    #                     '-nbins', dest="num_of_bins", default=30, type=int,
-    #                     help='The number of bins that we divide the output of the neurons')
 
     # parser.add_argument('-activation_function',
     #                     '-af', dest="activation_function", default=0, type=int,
