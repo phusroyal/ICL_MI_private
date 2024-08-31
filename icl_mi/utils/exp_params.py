@@ -108,7 +108,8 @@ def get_default_parser():
     #                     '-dd', dest="data_dir", default='data/',
     #                     help='The directory for finding the data')
 
-    args = parser.parse_args()
+    # args, = parser.parse_args()
+    args, unkonwn = parser.parse_known_args()
 
     # args.inds = [map(int, inner.split(',')) for inner in re.findall("\[(.*?)\]", args.inds)]
     # if num_of_samples != None:
