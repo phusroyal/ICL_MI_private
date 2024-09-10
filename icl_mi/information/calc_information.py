@@ -47,10 +47,13 @@ def calc_entropy_for_specipic_o(current_os, pv_i):
 
 def calc_cond_ent(p_vs, digitized_os, unique_inverse_vs):
 	""" Condition entropy of o given v """
+	# H2V_array = np.array(
+	# 	Parallel(n_jobs=NUM_CORES)(delayed(calc_entropy_for_specipic_o)(digitized_os[unique_inverse_vs == i, :], p_vs[i])
+	# 	                           for i in range(p_vs.shape[0])))
 	H2V_array = np.array(
-		Parallel(n_jobs=NUM_CORES)(delayed(calc_entropy_for_specipic_o)(digitized_os[unique_inverse_vs == i, :], p_vs[i])
-		                           for i in range(p_vs.shape[0])))
-	
+		[calc_entropy_for_specipic_o(digitized_os[unique_inverse_vs == i, :], p_vs[i])
+		 for i in range(p_vs.shape[0])]
+	)
 	H2V = np.sum(H2V_array)
 	return H2V
 
@@ -60,7 +63,7 @@ def calc_info_ov(p_vs, p_os, digitized_os, unique_inverse_vs):
 	IOV = HO - H2V
 	return IOV
 
-def get_info(vs, os, num_of_bins, calc_parallel=True):
+def get_info_ov(vs, os, num_of_bins):
 	# convert tensors to numpy arrays
 	vs = tensor2numpy(vs)
 	os = tensor2numpy(os)
@@ -72,21 +75,49 @@ def get_info(vs, os, num_of_bins, calc_parallel=True):
 
 	# Calculate the mutual information metrics local_IOV (information between output and Value matrix)
 	local_IOV = calc_info_ov(p_vs, p_os, digitized_os, unique_inverse_vs)
+	return local_IOV
 
-	params = {}
-	params['local_IOV'] = local_IOV
+def get_info_word(key, ov_list, num_of_bins):
+	o_val = ov_list[0]
+	v_lst = ov_list[1]
 
-	print("local_IOV: ", local_IOV)
+	# info_word = Parallel(n_jobs=NUM_CORES)(
+	# 	delayed(get_info_ov)(v, o_val, num_of_bins)
+	# 	for v in v_lst
+	# )
 
-	return params
+	info_word = [get_info_ov(v, o_val, num_of_bins) for v in v_lst]
 
-# params = np.array(
-# 			[calc_information_for_layer_with_other(data=ws_iter_index[i], bins=bins, unique_inverse_x=unique_inverse_x,
-# 			                                       unique_inverse_y=unique_inverse_y, label=label,
-# 			                                       b=b, b1=b1, len_unique_a=len_unique_a, pxs=pxs,
-# 			                                       p_YgX=py_x, pys1=pys1)
-# 			 for i in range(len(ws_iter_index))])
+	# Return the key and computed values so the dict can be updated outside
+	return key, info_word
 
-# def cal_info():
+	# return info_word
 
-# 	params = np.array(get_info() for i 
+
+def get_info_layer(dict_by_layer, num_of_bins):
+	# create a new dict and its keys are from the dict_by_layer and each key has an empty list
+	# info_dict = dict.fromkeys(dict_by_layer)
+
+	# Parallel(n_jobs=NUM_CORES)(
+	# 	delayed(get_info_word)(info_dict, key, dict_by_layer[key], num_of_bins)
+	# 	for key in dict_by_layer
+	# )
+
+	# for key in dict_by_layer:
+	# 	get_info_word(info_dict, key, dict_by_layer[key], num_of_bins)
+
+	info_dict = {}
+
+	# Parallelize only at the top level, and return results to update `info_dict`
+	results = Parallel(n_jobs=NUM_CORES)(
+		delayed(get_info_word)(key, dict_by_layer[key], num_of_bins)
+		for key in dict_by_layer
+	)
+
+	# Update the dictionary with results from parallel jobs
+	for key, info_word in results:
+		info_dict[key] = info_word
+
+	return info_dict
+	
+
