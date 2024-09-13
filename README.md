@@ -18,5 +18,10 @@ conda install jupyter
 conda install -n icl_mi ipykernel --update-deps --force-reinstall
 ```
 
+## TODO
+
+- [] not sure tanh is correct
+- [x] sum mi from all heads
+-  
 
 

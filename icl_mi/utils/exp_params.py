@@ -16,7 +16,7 @@ def get_default_parser():
                         help="Model's name")
 
     parser.add_argument('-num_of_bins',
-                        '-nbins', dest="num_of_bins", default=30, type=int,
+                        '-nbins', dest="num_of_bins", default=100, type=int,
                         help='The number of bins that we divide the output of the neurons')
 
     # parser.add_argument('-start_samples',

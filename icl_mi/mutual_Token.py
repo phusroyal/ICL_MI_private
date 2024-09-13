@@ -1,12 +1,13 @@
 import os, sys, multiprocessing
 import numpy as np
+import torch
 from torch import nn
 from joblib import Parallel, delayed
 from tqdm import tqdm
 # from collections import defaultdict
 
 from icl_mi.utils.exp_params import get_default_parser
-from icl_mi.utils.misc import seed_everything, limit_gpus
+from icl_mi.utils.misc import seed_everything, limit_gpus, sum_by_head
 from icl_mi.utils.model_tok_loader import load_model_and_tokenizer
 from icl_mi.QKVO_hooker import hook_qkv_and_head_outputs
 from icl_mi.information import calc_information as cinfo
@@ -21,7 +22,7 @@ class mutualToken():
         self.model = args.model
         self.nbins = args.num_of_bins
         
-        self.prompt = "female\tmiddle\t28 -> survival\nmale\tupper\t51 -> death\nmale\tlower\t21 ->"
+        self.prompt = "female middle 28 -> survival\nmale upper 51 -> death\nmale lower 21 ->"
         
         # limit_gpus([0, 1])
         limit_gpus(range(0, 1))
@@ -90,12 +91,14 @@ class mutualToken():
         # self.vs, self.os, self.information = np.empty((3, self.num_layer, self.num_head, self.seq_len), dtype=object)
 
         # activations
+        def gaussian_exp(x):
+            return torch.exp(-x**2)
         # act = nn.Softmax()
-        act = nn.Tanh()
+        # act = nn.Tanh()
         # apply tanch for all the layers of QKOV_raw['V'], QKOV_raw['attn_output_each_head']
         for l in range(self.num_layer):
-            self.QKOV_raw['V'][l] = act(self.QKOV_raw['V'][l])
-            self.QKOV_raw['attn_output_each_head'][l] = act(self.QKOV_raw['attn_output_each_head'][l])
+            self.QKOV_raw['V'][l] = gaussian_exp(self.QKOV_raw['V'][l])
+            self.QKOV_raw['attn_output_each_head'][l] = gaussian_exp(self.QKOV_raw['attn_output_each_head'][l])
         
         self.ov_dict_list = []
         for l in range(self.num_layer):
@@ -144,9 +147,11 @@ class mutualToken():
         #     for l in range(self.num_layer)
         # )
 
-        self.get_information_by_layer = [cinfo.get_info_layer(self.ov_dict_list[l], self.nbins) for l in tqdm(range(self.num_layer))]
+        get_information_by_layer = [cinfo.get_info_layer(self.ov_dict_list[l], self.nbins) for l in tqdm(range(self.num_layer))]
 
-        return self.get_information_by_layer
+        self.information = [sum_by_head(data, self.num_head, self.decoded_tokens) for data in get_information_by_layer]
+
+        return self.information
 
         # self.information = np.array(information_array).reshape(self.seq_len, self.num_layer, self.num_head)
         

@@ -21,3 +21,19 @@ def limit_gpus(gpu_ids: Iterable[int]) -> None:
 def json_reader(path):
     with open(path) as f:
         return json.load(f)
+
+def sum_by_head(info_dict, num_head, decoded_tokens):
+    mi_dict = {}
+
+    for i, t in enumerate(decoded_tokens):
+        mi_lst = []
+        # gather by head
+        for h in range(1, num_head+1):
+            mi_lst.append(info_dict[f"h_{h}_w{i+1}_{t}"])
+
+        # sum by head
+        mi_lst = np.sum(np.array(mi_lst), axis=0)
+
+        mi_dict[f"w{i+1}_{t}"] = mi_lst
+
+    return mi_dict

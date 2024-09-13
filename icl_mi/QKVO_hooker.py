@@ -1,5 +1,4 @@
 import torch
-# from transformers import GPT2Model, GPT2Tokenizer
 
 def hook_qkv_and_head_outputs(model, inputs):
     # Store the hooks and outputs
@@ -58,6 +57,7 @@ def hook_qkv_and_head_outputs(model, inputs):
     return outputs
 
 # # Usage
+# from transformers import GPT2Model, GPT2Tokenizer
 # model = GPT2Model.from_pretrained("gpt2")
 # prompt = "female\tmiddle\t28 -> survival\nmale\tupper\t51 -> death\nmale\tlower\t21 ->"
 # outputs = hook_qkv_and_head_outputs(model, prompt)
