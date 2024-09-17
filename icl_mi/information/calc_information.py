@@ -68,7 +68,7 @@ def get_info_ov(vs, os, num_of_bins):
 	vs = tensor2numpy(vs)
 	os = tensor2numpy(os)
 
-	bins = np.linspace(0, 1, num_of_bins)
+	bins = np.linspace(-1, 1, num_of_bins)
 
 	p_vs, unique_array_vs, unique_inverse_vs, digitized_vs = calc_probs(vs, bins)
 	p_os, unique_array_os, unique_inverse_os, digitized_os = calc_probs(os, bins)

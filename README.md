@@ -20,7 +20,7 @@ conda install -n icl_mi ipykernel --update-deps --force-reinstall
 
 ## TODO
 
-- [] not sure tanh is correct
+- [x] not sure tanh is correct -> sigmoid is better than tanh, arctan, gaussian
 - [x] sum mi from all heads
 -  
 

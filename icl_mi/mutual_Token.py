@@ -91,14 +91,14 @@ class mutualToken():
         # self.vs, self.os, self.information = np.empty((3, self.num_layer, self.num_head, self.seq_len), dtype=object)
 
         # activations
-        def gaussian_exp(x):
-            return torch.exp(-x**2)
-        # act = nn.Softmax()
+        # def gaussian_exp(x):
+        #     return torch.exp(-x**2)
+        act = nn.Softmax()
         # act = nn.Tanh()
         # apply tanch for all the layers of QKOV_raw['V'], QKOV_raw['attn_output_each_head']
         for l in range(self.num_layer):
-            self.QKOV_raw['V'][l] = gaussian_exp(self.QKOV_raw['V'][l])
-            self.QKOV_raw['attn_output_each_head'][l] = gaussian_exp(self.QKOV_raw['attn_output_each_head'][l])
+            self.QKOV_raw['V'][l] = act(self.QKOV_raw['V'][l])
+            self.QKOV_raw['attn_output_each_head'][l] = act(self.QKOV_raw['attn_output_each_head'][l])
         
         self.ov_dict_list = []
         for l in range(self.num_layer):
