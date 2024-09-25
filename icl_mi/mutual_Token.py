@@ -125,27 +125,6 @@ class mutualToken():
 
     def calc_information(self):
         """Calculate the information of each head in each layer for each token in the sequence"""
-        # information_array = np.array(
-        #     [cinfo.get_info(self.vs[l][h][w], self.os[l][h][w], self.nbins)
-        #         for w in range(self.seq_len) for h in range(self.num_head) for l in range(self.num_layer)]
-        # )
-        # self.information = information_array.reshape(self.seq_len, self.num_layer, self.num_head)
-
-        # information_array = Parallel(n_jobs=NUM_CORES)(
-        #     delayed(cinfo.get_info)(self.vs[l][h][w], self.os[l][h][w], self.nbins)
-        #     for w in range(self.seq_len) for h in range(self.num_head) for l in range(self.num_layer)
-        # )
-
-        # self.QKOV_raw = hook_qkv_and_head_outputs(self.model, self.inputs)
-        # # get num_head, seq_len, and num_layer (num_layer, bs, num_head, seq_len, dim)
-        # self.num_head = self.QKOV_raw['Q'][0].shape[1] 
-        # self.seq_len = self.QKOV_raw['Q'][0].shape[2]
-        # self.num_layer = len(self.QKOV_raw['Q'])
-
-        # self.get_information_by_layer = Parallel(n_jobs=NUM_CORES)(
-        #     delayed(cinfo.get_info_layer)(self.ov_dict_list[l], self.nbins)
-        #     for l in range(self.num_layer)
-        # )
 
         get_information_by_layer = [cinfo.get_info_layer(self.ov_dict_list[l], self.nbins) for l in tqdm(range(self.num_layer))]
 
@@ -161,8 +140,5 @@ class mutualToken():
 
     def get_model(self):
         return self.model
-    
-    # def get_token_dict(self):
-    #     return self.decoded_tokens
 
 
