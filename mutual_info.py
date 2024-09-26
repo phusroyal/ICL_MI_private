@@ -121,7 +121,9 @@ def main():
     # encode prompt
     info_lst = []
     for idx, p in enumerate(prompt_list):
-        print(f"Processing prompt {idx+1}/{len(prompt_list)}...")
+        if idx < 4:
+            continue
+        print(f"Processing prompt {idx}/{len(prompt_list)}...")
 
         inputs = tokenizer(p, return_tensors="pt")
         decoded_tokens = tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
