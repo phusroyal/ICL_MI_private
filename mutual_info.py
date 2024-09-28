@@ -108,7 +108,7 @@ def main():
     # limit gpus
     limit_gpus(range(0, 1))
     # load data
-    data_path = 'data/selection_15.json'
+    data_path = 'data/selection_17.json'
     prompt_list, labels = load_data_json(data_path)
     # load model and tokenizer
     model, tokenizer = load_model_and_tokenizer(args.model)
@@ -121,8 +121,8 @@ def main():
     # encode prompt
     info_lst = []
     for idx, p in enumerate(prompt_list):
-        if idx < 4:
-            continue
+        # if idx < 9:
+        #     continue
         print(f"Processing prompt {idx}/{len(prompt_list)}...")
 
         inputs = tokenizer(p, return_tensors="pt")
@@ -155,12 +155,12 @@ def main():
         information = [sum_by_head(data, num_head, decoded_tokens) for data in get_information_by_layer]
 
         # save information as a text file for each prompt
-        with open(f"data/info_15_{idx}.txt", 'w', encoding='utf-8') as f:
+        with open(f"data/info_17_{idx}.txt", 'w', encoding='utf-8') as f:
             json.dump(information, f, ensure_ascii=False, indent=4, default=convert_ndarray)
 
         info_lst.append(information)
     
-    with open(f"data/info_15_total.txt", 'w', encoding='utf-8') as f:
+    with open(f"data/info_17_total.txt", 'w', encoding='utf-8') as f:
             json.dump(information, f, ensure_ascii=False, indent=4, default=convert_ndarray)
 
 if __name__ == "__main__":

@@ -302,7 +302,7 @@ if __name__ == "__main__":
     #     "colors": ["red", "green", "blue", "yellow", "black", "grey", "white", "brown"],
     #     "animals": ["dog", "cat", "bird", "fish", "ant", "ape", "bat", "frog"],
     #     "elements": ["fire", "water", "earth", "air", "light", "ice", "metal", "wood"],
-    #     "vehicles": ["car", "bike", "bus", "train", "plane", "boat", "ship", "truck"],
+    #     "vehicles": ["car", "bike", "bus", "train", "plane", "boat", "ship", "van"],
     #     "cutlery": ["fork", "knife", "pot", "pick", "plate", "bowl", "cup", "pan"],
     #     "clothes": ["shirt", "pants", "hat", "watch", "dress", "ring", "boot", "suits"],
     #     "metals": ["iron", "copper", "zinc", "gold", "silver", "nickel", "tin", "iodine"]
