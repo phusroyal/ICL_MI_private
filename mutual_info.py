@@ -37,16 +37,18 @@ def load_data_json(file):
         prompt_data = data["prompts_list"]
     
     prompt_list = []
+    preds = []
     labels = []
     for prompt in prompt_data:
+        labels.append(set([de.split()[-1] for de in prompt]))
         p = " ".join(prompt[:-1])
         last_prompt = prompt[-1].split(" ")
         for i in range(0, len(last_prompt)-1):
             p += " " + last_prompt[i]
         prompt_list.append(p)
-        labels.append(last_prompt[-1])
+        preds.append(last_prompt[-1])
 
-    return prompt_list, labels
+    return prompt_list, preds, labels
 
 # A function that converts NumPy arrays to lists
 def convert_ndarray(obj):
@@ -54,7 +56,7 @@ def convert_ndarray(obj):
         return obj.tolist()
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
-def extract_vectors(decoded_tokens, o_tensor, v_tensor):
+def extract_vectors(decoded_tokens, labels, o_tensor, v_tensor):
     """
     Efficiently extract o and v vectors for each head and word using PyTorch tensors.
 
@@ -76,21 +78,21 @@ def extract_vectors(decoded_tokens, o_tensor, v_tensor):
     # Loop over heads and words, but use PyTorch indexing to extract o and v vectors efficiently
     for i in range(num_heads):
         for j in range(1, num_words + 1):
-            # Extract o vector for the current head and word
-            o_vector = o_tensor[0, i, j - 1]  # Shape: (num_dims,)
-
-            # Extract all v vectors for words from 1 to j in the current head
-            v_vectors = v_tensor[0, i, :j]  # Shape: (j, num_dims)
-
             # Create the dictionary key: h_<head>_w<word>_<token>
             token = decoded_tokens[j - 1]
-            key = f"h_{i + 1}_w{j}_{token}"
-            
-            # Store the tuple (o_vector, v_vectors) in the dictionary
-            results[key] = (o_vector, v_vectors)
+            key = f"h_{i + 1}_w{j}_{token}"            
+            # check if token is in labels or -> in token
+            if any(f in key for f in labels) or ('->' in key): 
+                # Extract o vector for the current head and word
+                o_vector = o_tensor[0, i, j - 1]  # Shape: (num_dims,)
+
+                # Extract all v vectors for words from 1 to j in the current head
+                v_vectors = v_tensor[0, i, :j]  # Shape: (j, num_dims)
+                
+                # Store the tuple (o_vector, v_vectors) in the dictionary
+                results[key] = (o_vector, v_vectors)
 
     return results
-
 
 
 def main():
@@ -108,8 +110,8 @@ def main():
     # limit gpus
     limit_gpus(range(0, 1))
     # load data
-    data_path = 'data/selection_17.json'
-    prompt_list, labels = load_data_json(data_path)
+    data_path = 'data/info_15_swap/selection_15_swaped.json'
+    prompt_list, preds, labels = load_data_json(data_path)
     # load model and tokenizer
     model, tokenizer = load_model_and_tokenizer(args.model)
     # activation
@@ -121,7 +123,7 @@ def main():
     # encode prompt
     info_lst = []
     for idx, p in enumerate(prompt_list):
-        # if idx < 9:
+        # if idx < 2:
         #     continue
         print(f"Processing prompt {idx}/{len(prompt_list)}...")
 
@@ -145,6 +147,7 @@ def main():
         start = time.time()
         for l in range(num_layer):
             ov_dict_list.append(extract_vectors(decoded_tokens,
+                                                labels[idx],
                                                 QKOV_raw['attn_output_each_head'][l], 
                                                 QKOV_raw['V'][l]))
         # print(f"Extracting time: {time.time()-start}")
@@ -152,15 +155,15 @@ def main():
         # get information for each layer
         get_information_by_layer = [cinfo.get_info_layer(ov_dict_list[l], args.num_bins) for l in tqdm(range(num_layer))]
 
-        information = [sum_by_head(data, num_head, decoded_tokens) for data in get_information_by_layer]
+        information = [sum_by_head(data, num_head, labels[idx], decoded_tokens) for data in get_information_by_layer]
 
-        # save information as a text file for each prompt
-        with open(f"data/info_17_{idx}.txt", 'w', encoding='utf-8') as f:
+        # save information as a text file for each prompt 
+        with open(f"data/info_15_swap/info_15s_{idx}.txt", 'w', encoding='utf-8') as f:
             json.dump(information, f, ensure_ascii=False, indent=4, default=convert_ndarray)
 
         info_lst.append(information)
     
-    with open(f"data/info_17_total.txt", 'w', encoding='utf-8') as f:
+    with open(f"data/info_15_swap/info_15s_total.txt", 'w', encoding='utf-8') as f:
             json.dump(information, f, ensure_ascii=False, indent=4, default=convert_ndarray)
 
 if __name__ == "__main__":
