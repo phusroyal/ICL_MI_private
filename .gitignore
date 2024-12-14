@@ -1,3 +1,5 @@
 results
 *.gz
 *.pyc
+*.txt
+!requirements.txt
