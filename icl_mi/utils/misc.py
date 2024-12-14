@@ -40,3 +40,14 @@ def sum_by_head(info_dict, num_head, labels, decoded_tokens):
             mi_dict[f"w{i+1}_{t}"] = None
 
     return mi_dict
+
+def none_token(info_dict, num_head, labels, decoded_tokens):
+    mi_dict = {}
+
+    for i, t in enumerate(decoded_tokens):
+        if any(f in t for f in labels) or ('->' in t):
+            mi_dict[f"w{i+1}_{t}"] = info_dict[f"w{i+1}_{t}"]
+        else:
+            mi_dict[f"w{i+1}_{t}"] = None
+
+    return mi_dict

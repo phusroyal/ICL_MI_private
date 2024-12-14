@@ -181,7 +181,7 @@ def remove_excess_duplicates_and_shuffle(input_list, max_occurrences=2):
 def simplifier(prompts_list, selected_keys, feature_dict, index):
     """Function to simplify the prompts for each selection."""
     # reduce duplicates when only the number of dubplicates is greater than 3
-    prompts_list = remove_excess_duplicates_and_shuffle(prompts_list, max_occurrences=2)
+    prompts_list = remove_excess_duplicates_and_shuffle(prompts_list, max_occurrences=5)
 
     # get feature1, feature2, and output keys
     f1s = []
@@ -226,7 +226,6 @@ def generate_meta_data(mi_list, feature_dict, num_demo=300, seed=42):
 
     # Select unique feature and output keys without overlap
     selected_keys = select_keys_no_overlap(feature_dict, num_selections=len(mi_list))
-    
     meta_data = {}
 
     # For each mutual information pair and feature key selection
@@ -246,21 +245,19 @@ def generate_meta_data(mi_list, feature_dict, num_demo=300, seed=42):
 
         new_prompts, actual_mi = simplifier(prompts, selected_keys, feature_dict, i)
 
-        # Store the metadata
-        meta_data[f"selection_{i+1}"] = {
-            "features": {
-                "feature1": f1_key,
-                "feature2": f2_key,
-                "output": output_key
-            },
-            "mi": actual_mi,
-            "synthesized_data": {
-                "feature1_list": f1_list,
-                "feature2_list": f2_list,
-                "output_list": out_list
-            }, 
-            "prompts_list": new_prompts
-        }
+        val1, val2 = actual_mi
+        print(actual_mi)
+        # if ((val1 < 1) and (2 <= val2)) or ((val2 < 1) and (2 <= val1)): # low-high
+        # if val1 < 1 and val2 < 1: # low-low
+        if 1 < val1 < 1.7 and 1 < val2 < 1.7: # med-med
+        # if ((1 < val1 < 2) and (2 <= val2)) or ((1 < val2 < 2) and (2 <= val1)): # med-high 
+        # if 2 <= val1 and 2 <= val2: # high-high
+
+            # Store the metadata
+            meta_data[f"selection_{i+1}"] = {
+                "mi": actual_mi,
+                "prompts_list": new_prompts
+            }
     
     return meta_data
 
@@ -286,10 +283,10 @@ def generate_mi_pairs(num_pairs=10, min_mi=0.1, max_mi=3.0):
     
     for _ in range(num_pairs):
         # Randomly generate the second MI within the range [min_mi, max_mi/3]
-        mi2 = random.uniform(min_mi, max_mi / 3)
+        mi2 = random.uniform(min_mi, max_mi/2)
         
         # Ensure the first MI is at least 1.5 the second MI
-        mi1 = random.uniform(mi2, max_mi/2)
+        mi1 = random.uniform(max_mi/3, max_mi/1.2)
         
         mi_pairs.append((mi2, mi1))
     
@@ -297,35 +294,38 @@ def generate_mi_pairs(num_pairs=10, min_mi=0.1, max_mi=3.0):
 
 
 if __name__ == "__main__":
-    # FEATURE_DICT = {
-    #     "fruits": ["apple", "lime", "melon", "orange", "corn", "fig", "berry", "date"],
-    #     "colors": ["red", "green", "blue", "yellow", "black", "grey", "white", "brown"],
-    #     "animals": ["dog", "cat", "bird", "fish", "ant", "ape", "bat", "frog"],
-    #     "elements": ["fire", "water", "earth", "air", "light", "ice", "metal", "wood"],
-    #     "vehicles": ["car", "bike", "bus", "train", "plane", "boat", "ship", "van"],
-    #     "cutlery": ["fork", "knife", "pot", "pick", "plate", "bowl", "cup", "pan"],
-    #     "clothes": ["shirt", "pants", "hat", "watch", "dress", "ring", "boot", "suits"],
-    #     "metals": ["iron", "copper", "zinc", "gold", "silver", "nickel", "tin", "iodine"]
-    # }
     FEATURE_DICT = {
-        "fruits": ["apple", "lime", "melon", "date"],
-        "colors": ["red", "green", "blue", "yellow"],
-        "animals": ["dog", "cat", "bird", "fish"],
-        "elements": ["fire", "water", "earth", "air"],
-        "vehicles": ["car", "bike", "bus", "train"],
-        "cutlery": ["fork", "knife", "pot", "pick"],
-        "clothes": ["shirt", "pants", "hat", "watch"],
-        "metals": ["iron", "copper", "zinc", "gold"]
+        "fruits": ["apple", "lime", "melon", "orange", "corn", "fig", "berry", "date"],
+        "colors": ["red", "green", "blue", "yellow", "black", "grey", "white", "brown"],
+        "animals": ["dog", "cat", "bird", "fish", "ant", "ape", "bat", "frog"],
+        "elements": ["fire", "water", "earth", "air", "light", "ice", "metal", "wood"],
+        "vehicles": ["car", "bike", "bus", "train", "plane", "boat", "ship", "van"],
+        "cutlery": ["fork", "knife", "pot", "pick", "plate", "bowl", "cup", "pan"],
+        "clothes": ["shirt", "pants", "hat", "watch", "dress", "ring", "boot", "suits"],
+        "metals": ["iron", "copper", "zinc", "gold", "silver", "nickel", "tin", "iodine"]
     }
+    # FEATURE_DICT = {
+    #     "fruits": ["apple", "lime", "melon", "date"],
+    #     "colors": ["red", "green", "blue", "yellow"],
+    #     "animals": ["dog", "cat", "bird", "fish"],
+    #     "elements": ["fire", "water", "earth", "air"],
+    #     "vehicles": ["car", "bike", "bus", "train"],
+    #     "cutlery": ["fork", "knife", "pot", "pick"],
+    #     "clothes": ["shirt", "pants", "hat", "watch"],
+    #     "metals": ["iron", "copper", "zinc", "gold"]
+    # }
+    import random
+    random.seed(42)
+    seeds = [random.randint(1, 1000) for _ in range(500)]
+    num_demo = []
+    for seed in seeds:
+        num_pairs = 52
+        num_demo = 80 #to fit context length of 1042
 
-    seed = 42
-    num_pairs = 20
-    num_demo = 100 #to fit context length of 1042
+        random.seed(seed)
+        np.random.seed(seed)
 
-    random.seed(seed)
-    np.random.seed(seed)
-
-    MI_list = generate_mi_pairs(num_pairs=num_pairs, min_mi=0.1, max_mi=2.0)
-    print(MI_list)
-    meta_data = generate_meta_data(MI_list, FEATURE_DICT, num_demo=num_demo, seed=seed)
-    save_meta_data_to_files(meta_data, directory="data/data_files")
+        MI_list = generate_mi_pairs(num_pairs=num_pairs, min_mi=0.1, max_mi=3.0)
+        # print(MI_list)
+        meta_data = generate_meta_data(MI_list, FEATURE_DICT, num_demo=num_demo, seed=seed)
+        save_meta_data_to_files(meta_data, directory="data/data_files")

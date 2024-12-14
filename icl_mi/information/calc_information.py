@@ -3,9 +3,20 @@ import numpy as np
 from joblib import Parallel, delayed
 import warnings
 warnings.filterwarnings("ignore")
-from tqdm import tqdm
 
+from typing import Optional, List
+
+from tqdm import tqdm
 from time import time
+
+import bmi
+import sys
+import os
+import contextlib
+
+from sklearn.neighbors import NearestNeighbors, KDTree
+from scipy.special import gamma, digamma
+from scipy.stats import binned_statistic
 
 NUM_CORES = multiprocessing.cpu_count()
 
@@ -74,26 +85,211 @@ def get_info_ov(vs, os, num_of_bins):
 
 	return local_IOV
 
+def _get_knn_mi(x: np.array, y: np.array, n_neighbors: int, clip_negative: Optional[bool] = False) -> float:
+	"""
+	Compute mutual information between two continuous variables.
+	Parameters
+	----------
+	x, y            :   (n_samples,) Samples of two continuous random variables, 
+						must have an identical shape.
+	n_neighbors     :   Number of nearest neighbors to search for each point, see [1].
+	clip_negative   :   Whether to clip negative values to zero.
 
-def get_info_word(key, ov_list, num_of_bins):
+	Returns
+	-------
+	mi          :   Estimated mutual information. 
+					If it turned out to be negative it is replace by 0.
+
+	NOTE
+	-----
+	True mutual information can't be negative. If its estimate by a numerical
+	method is negative, it means (providing the method is adequate) that the
+	mutual information is close to 0 and replacing it by 0 is a reasonable
+	strategy.
+
+	References
+	----------
+	.. [1] A. Kraskov, H. Stogbauer and P. Grassberger, "Estimating mutual
+			information". Phys. Rev. E 69, 2004.
+	"""
+	x = tensor2numpy(x)
+	y = tensor2numpy(y)
+
+	n_samples = x.size	
+
+	x = x.reshape((-1, 1))      # (n_samples, 1)
+	y = y.reshape((-1, 1))      # (n_samples, 1)
+	xy = np.hstack((x, y))      # z = (x, y) -> (n_samples, 2)
+
+	# Here we rely on NearestNeighbors to select the fastest algorithm.
+	nn = NearestNeighbors(metric="chebyshev", n_neighbors=n_neighbors)
+	# ^ distance metric used is the max-norm (https://en.wikipedia.org/wiki/Chebyshev_distance)
+	# dist(z2, z1) = max(||x2-x1||, ||y2-y1||)
+	# the same metric is used for x and y, i.e., simply
+	# dist(x2, x1) = (x2 - x1), when x is 1-dimensional
+
+	nn.fit(xy)                              # fitting KNN on joint z = (x, y)
+	radius = nn.kneighbors()[0]             # kneighbors() returns (distances, neighbors) 
+											# for all samples -> (2, n_samples, n_neighbors)
+											# we only use the distances as the query radii 
+	radius = np.nextafter(radius[:, -1], 0)
+
+	# KDTree is explicitly fit to allow for the querying of number of
+	# neighbors within a specified radius
+	kd = KDTree(x, metric="chebyshev")
+	nx = kd.query_radius(x, radius, 
+							count_only=True, 
+							return_distance=False) # number of points in x that are within the query radius
+												# -> (n_samples)
+	nx = np.array(nx) - 1.0                     # (nx-1)
+
+	kd = KDTree(y, metric="chebyshev")
+	ny = kd.query_radius(y, radius, 
+							count_only=True, 
+							return_distance=False) # number of points in y that are within the query radius
+												# -> (n_samples)
+	ny = np.array(ny) - 1.0                     # (ny -1)
+
+	mi = (
+		digamma(n_samples)
+		+ digamma(n_neighbors)
+		- np.mean(digamma(nx + 1))
+		- np.mean(digamma(ny + 1))
+	)                               # I(X; Y) = ψ(S) + ψ(k) - 1/N*sum(ψ(nx) + ψ(ny))
+
+	if clip_negative:
+		return max(0, mi)
+	return mi	
+
+def _get_binned_entropy(x: np.array, num_bins: Optional[int]=10, 
+                        bin_edges: Optional[np.array]=None) -> float:
+	"""
+	Compute entropy by discretizing the given continuous random variables.
+	Discretization here is done by binning the continuous values into 
+	equally-spaced descrete clusters. 
+
+	Parameters
+	----------
+	x           :   (n_samples, d) the continuous random variable
+					where, d \in {1, 2}. 
+	num_bins    :   number of bins into which to cluster the values.
+					if, d==2: we would use num_bins**2 bins.
+	bin_edges   :   pre-computed bin edges for discretization of reps;
+					this is usually used when global binning is employed.
+
+	Returns
+	-------
+	h           :   entropy H(X)
+
+	"""
+	if x.shape[1] == 2:	
+		x_1, x_2 = x[:, 0], x[:, 1]
+		if bin_edges is None:
+			_, bin_edges_1, bin_edges_2 = np.histogram2d(x_1, x_2, bins=num_bins)	
+		# bin_edges_1, bin_edges_2 = bin_edges
+		binned_x_1, binned_x_2 = np.digitize(x_1, bin_edges_1), np.digitize(x_1, bin_edges_2)
+		clusters, num_c = {}, 0
+		for i in np.unique(binned_x_1):
+			for j in np.unique(binned_x_2):
+				if((i, j) not in clusters):
+					clusters[(i, j)] = num_c
+					num_c += 1
+		binned_x = np.array([clusters[(binned_x_1[i], binned_x_2[i])] for i in range(len(x))])
+	else:
+		x = x.reshape(-1)
+		if bin_edges is None:
+			_, bin_edges = np.histogram(x, bins=num_bins)
+		binned_x = np.digitize(x, bin_edges)
+
+	def _get_discrete_entropy(X: np.array) -> float:
+		_, counts = np.unique(X, return_counts=True)
+		probs = counts / len(X)
+		if np.count_nonzero(probs) <= 1:
+			return 0
+
+		ent = 0.
+		for i in probs:
+			ent -= i * np.log(i)
+
+		return ent
+
+	return _get_discrete_entropy(binned_x)
+
+def _get_binned_mi(x: np.array, y: np.array, num_bins: int, 
+                   clip_negative: Optional[bool] = True) -> float:
+    n_samples = x.size
+
+    x = x.reshape((-1, 1))      # (n_samples, 1)
+    y = y.reshape((-1, 1))      # (n_samples, 1)
+    xy = np.hstack((x, y))      # z = (x, y) -> (n_samples, 2)
+
+    mi = _get_binned_entropy(x, num_bins) \
+        + _get_binned_entropy(y, num_bins) \
+        - _get_binned_entropy(xy, num_bins)
+    
+    if clip_negative:
+        return max(0, mi)
+    return mi
+
+def _get_bmi(x: np.array, y: np.array) -> float:
+	n_samples = x.size
+
+	x = x.reshape((-1, 1))      # (n_samples, 1)
+	y = y.reshape((-1, 1))      # (n_samples, 1)
+
+	method = 'ksg'
+	if method == 'cca':
+		estimator = bmi.estimators.CCAMutualInformationEstimator()
+		mi = estimator.estimate(x, y)
+	elif method == 'ksg':
+		estimator = bmi.estimators.KSGEnsembleFirstEstimator(neighborhoods=(10,))
+		mi = estimator.estimate(x, y)
+	elif method == 'mine':
+		with contextlib.redirect_stdout(open(os.devnull, 'w')):
+			estimator = bmi.estimators.MINEEstimator()
+			mi = estimator.estimate(x, y)
+	elif method == 'infoNCE':
+		estimator = bmi.estimators.InfoNCEEstimator()
+		mi = estimator.estimate(x, y)
+	
+	return mi
+
+def get_info_word(key, ov_list, num_of_bins, method):
 	o_val = ov_list[0]
 	v_lst = ov_list[1]
 
-	info_word = [get_info_ov(v, o_val, num_of_bins) for v in v_lst]
+	num_neighbors = 10
+
+	if method == 'binned':
+		# info_word = [get_info_ov(v, o_val, num_of_bins) for v in v_lst]
+		info_word = [_get_binned_mi(v, o_val, num_of_bins) for v in v_lst]
+	elif method == 'knn':
+		info_word = [_get_knn_mi(v, o_val, num_neighbors) for v in v_lst]
+	elif method == 'bmi':
+		info_word = [_get_bmi(v, o_val) for v in v_lst]
 
 	# Return the key and computed values so the dict can be updated outside
 	return key, info_word
 
-
-
-def get_info_layer(dict_by_layer, num_of_bins):
+def get_info_layer(dict_by_layer, num_of_bins, method):
 	info_dict = {}
 
-	# Parallelize only at the top level, and return results to update `info_dict`
+	# if method == 'binned':
+	# # Parallelize only at the top level, and return results to update `info_dict`
+	# 	results = Parallel(n_jobs=NUM_CORES)(
+	# 		delayed(get_info_word)(key, dict_by_layer[key], num_of_bins, method)
+	# 		for key in dict_by_layer
+	# 	)
+	# elif method == 'knn':
+	# 	# no parallelization for knn
+	# 	results = [get_info_word(key, dict_by_layer[key], num_of_bins, method) for key in dict_by_layer]
+
 	results = Parallel(n_jobs=NUM_CORES)(
-	    delayed(get_info_word)(key, dict_by_layer[key], num_of_bins)
-	    for key in dict_by_layer
-	)
+			delayed(get_info_word)(key, dict_by_layer[key], num_of_bins, method)
+			for key in dict_by_layer
+		)
+	
+	# results = [get_info_word(key, dict_by_layer[key], num_of_bins, method) for key in dict_by_layer]
 
 	# Update the dictionary with results from parallel jobs
 	for key, info_word in results:

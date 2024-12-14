@@ -8,3 +8,7 @@ matplotlib==3.9.2
 seaborn==0.13.2
 scipy==1.14.1
 scikit-learn==1.5.2
+
+###
+pip install benchmark-mi
+pip install --upgrade jax==0.4.28 jaxlib==0.4.28+cuda12.cudnn89 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html

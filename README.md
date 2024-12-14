@@ -24,4 +24,7 @@ conda install -n icl_mi ipykernel --update-deps --force-reinstall
 - [x] sum mi from all heads
 -  
 
+## model architect
+
+
 
